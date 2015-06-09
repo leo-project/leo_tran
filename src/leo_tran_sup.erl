@@ -18,10 +18,6 @@
 %% specific language governing permissions and limitations
 %% under the License.
 %%
-%% ---------------------------------------------------------------------
-%% @doc leo_trans's app
-%% @reference https://github.com/leo-project/leo_tran/blob/master/src/leo_tran_sup.erl
-%% @end
 %%======================================================================
 -module(leo_tran_sup).
 

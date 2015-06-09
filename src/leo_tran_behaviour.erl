@@ -18,8 +18,6 @@
 %% specific language governing permissions and limitations
 %% under the License.
 %%
-%% @doc The ordning-reda's behaviour.
-%% @end
 %%======================================================================
 -module(leo_tran_behaviour).
 -author('Yosuke Hara').

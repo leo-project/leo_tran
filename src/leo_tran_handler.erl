@@ -18,11 +18,6 @@
 %% specific language governing permissions and limitations
 %% under the License.
 %%
-%% ---------------------------------------------------------------------
-%% Leo Bakcend DB - Server
-%% @doc The gen_server process for the process of database as part of a supervision tree
-%% @reference https://github.com/leo-project/leo_backend_db/blob/master/src/leo_backend_db_server.erl
-%% @end
 %%======================================================================
 -module(leo_tran_handler).
 -author('Yosuke Hara').
