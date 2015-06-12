@@ -32,8 +32,8 @@
          stop/0]).
 
 %% data operations.
--export([run/4,
-         state/2,
+-export([run/5,
+         state/3,
          all_states/0
         ]).
 
@@ -71,23 +71,25 @@ stop() ->
 %%--------------------------------------------------------------------
 %% @doc Run a transaction
 %%
--spec(run(Table, Key, Callback, Options) ->
+-spec(run(Table, Key, Method, Callback, Options) ->
              ok | {error, any()} when Table::atom(),
                                       Key::any(),
+                                      Method::atom(),
                                       Callback::module(),
                                       Options::[{tran_prop(), any()}]).
-run(Table, Key, Callback, Options) ->
-    gen_server:call(?MODULE, {run, Table, Key, Callback, Options}, ?DEF_TIMEOUT).
+run(Table, Key, Method, Callback, Options) ->
+    gen_server:call(?MODULE, {run, Table, Key, Method, Callback, Options}, ?DEF_TIMEOUT).
 
 
 %% @doc Retrieve a state by the table and the key
 %%
--spec(state(Table, Key) ->
+-spec(state(Table, Key, Method) ->
              {ok, running | not_running} |
              {error, any()} when Table::atom(),
-                                 Key::any()).
-state(Table, Key) ->
-    gen_server:call(?MODULE, {state, Table, Key}, ?DEF_TIMEOUT).
+                                 Key::any(),
+                                 Method::atom()).
+state(Table, Key, Method) ->
+    gen_server:call(?MODULE, {state, Table, Key, Method}, ?DEF_TIMEOUT).
 
 
 %% @doc Retrieve all states
@@ -117,11 +119,12 @@ handle_call(stop, _From, State) ->
 %%--------------------------------------------------------------------
 %% Data Operation related.
 %%--------------------------------------------------------------------
-handle_call({run, Table, Key, Callback, Options}, From, #state{monitor_list = MonitorList,
-                                                               tran_list = TranList} = State) ->
+handle_call({run, Table, Key, Method, Callback, Options},
+            From, #state{monitor_list = MonitorList,
+                         tran_list = TranList} = State) ->
     %%  Check already started transaction(s)
     %%  And need to lock the transaction
-    HasTran = (error /= dict:find({Table, Key}, TranList)),
+    HasTran = (error /= dict:find({Table, Key, Method}, TranList)),
     CanStartTran = case leo_misc:get_value(?PROP_IS_WAIT_FOR_TRAN, Options, true) of
                        true ->
                            true;
@@ -135,21 +138,24 @@ handle_call({run, Table, Key, Callback, Options}, From, #state{monitor_list = Mo
     %%  Launch a transaction
     case CanStartTran of
         true ->
-            case leo_tran_handler:start_link(self(), Table, Key, Callback, Options) of
+            case leo_tran_handler:start_link(self(), Table, Key,
+                                             Method, Callback, Options) of
                 {ok, ChildPid} ->
                     MonitorRef = erlang:monitor(process, ChildPid),
                     Clock = leo_date:clock(),
-                    Method = case HasTran of
-                                 false ->
-                                     run;
-                                 true when CanLockTran == false ->
-                                     run;
-                                 true ->
-                                     wait
-                             end,
-                    ok = erlang:apply(leo_tran_handler, Method, [ChildPid, MonitorRef]),
-                    TranList_1 = dict:append({Table, Key}, {MonitorRef, ChildPid, Clock}, TranList),
-                    MonList_1 = dict:store(MonitorRef, {Table, Key, From, ChildPid, Clock}, MonitorList),
+                    Verb = case HasTran of
+                               false ->
+                                   run;
+                               true when CanLockTran == false ->
+                                   run;
+                               true ->
+                                   wait
+                           end,
+                    ok = erlang:apply(leo_tran_handler, Verb, [ChildPid, MonitorRef]),
+                    TranList_1 = dict:append({Table, Key, Method},
+                                             {MonitorRef, ChildPid, Clock}, TranList),
+                    MonList_1 = dict:store(MonitorRef, {Table, Key, Method,
+                                                        From, ChildPid, Clock}, MonitorList),
                     {noreply, State#state{monitor_list = MonList_1,
                                           tran_list = TranList_1}};
                 {error, Cause} ->
@@ -159,8 +165,8 @@ handle_call({run, Table, Key, Callback, Options}, From, #state{monitor_list = Mo
             {reply, {error, ?ERROR_ALREADY_HAS_TRAN}, State}
     end;
 
-handle_call({state, Table, Key},_From, #state{tran_list = TranList} = State) ->
-    Ret = case (error == dict:find({Table, Key}, TranList)) of
+handle_call({state, Table, Key, Method},_From, #state{tran_list = TranList} = State) ->
+    Ret = case (error == dict:find({Table, Key, Method}, TranList)) of
               true ->
                   not_running;
               false ->
@@ -173,7 +179,8 @@ handle_call(all_states,_From, #state{tran_list = TranList} = State) ->
                true ->
                    [];
                false ->
-                   [{Tbl, Key} || {{Tbl,Key},_} <- dict:to_list(TranList)]
+                   [{Tbl, Key, Method}
+                    || {{Tbl, Key, Method},_} <- dict:to_list(TranList)]
            end,
     {reply, {ok, RetL}, State};
 
@@ -187,15 +194,15 @@ handle_cast(_Msg, State) ->
 
 
 %% @doc gen_server callback - Module:handle_info(Info, State) -> Result
-handle_info({Method, ChildPid, MonitorRef, TranState, Table, Key, Reply},
+handle_info({Msg, ChildPid, MonitorRef, TranState, Table, Key, Method, Reply},
             #state{monitor_list = MonList,
-                   tran_list = TranList} = State) when Method == finished;
-                                                       Method == error;
-                                                       Method == timeout ->
+                   tran_list = TranList} = State) when Msg == finished;
+                                                       Msg == error;
+                                                       Msg == timeout ->
     %% Modify the monitor-reference list
     MonitorRef_1 = get_monitor_ref(MonitorRef, ChildPid, MonList),
     MonList_1 = case dict:find(MonitorRef_1, MonList) of
-                    {ok,{_Table,_Key, From,_ChildPid,_StartedAt}} ->
+                    {ok,{_Table,_Key,_Method, From,_ChildPid,_StartedAt}} ->
                         gen_server:reply(From, Reply),
                         dict:erase(MonitorRef, MonList);
                     _ ->
@@ -203,13 +210,13 @@ handle_info({Method, ChildPid, MonitorRef, TranState, Table, Key, Reply},
                 end,
 
     %% Modify the transaction list
-    TranList_1 = case dict:find({Table, Key}, TranList) of
+    TranList_1 = case dict:find({Table, Key, Method}, TranList) of
                      {ok, RetL} ->
                          MonRefL = exclude_monitor_ref(RetL, MonitorRef, []),
                          case TranState of
                              run ->
                                  _ = send_reume_to_waiting_procs(MonRefL, MonList),
-                                 dict:erase({Table, Key}, TranList);
+                                 dict:erase({Table, Key, Method}, TranList);
                              _ ->
                                  TranList
                          end;
@@ -220,22 +227,22 @@ handle_info({Method, ChildPid, MonitorRef, TranState, Table, Key, Reply},
                           tran_list = TranList_1}};
 handle_info({'DOWN', MonitorRef, _Type,_Pid, _Info}, #state{monitor_list = MonList,
                                                             tran_list = TranList} = State) ->
-    {Table_1, Key_1, MonList_1} =
+    {Table_1, Key_1, Method_1, MonList_1} =
         case dict:find(MonitorRef, MonList) of
-            {ok,{Table, Key, From,_StartedAt}} ->
+            {ok,{Table, Key, Method, From,_StartedAt}} ->
                 gen_server:reply(From, {error, badtran}),
-                {Table, Key, dict:erase(MonitorRef, MonList)};
+                {Table, Key, Method, dict:erase(MonitorRef, MonList)};
             _ ->
-                {null, null, MonList}
+                {null, null, null, MonList}
         end,
 
     TranList_1 =
-        case (Table_1 /= null andalso Key_1 /= null) of
+        case (Table_1 /= null andalso Key_1 /= null andalso Method_1 /= null) of
             true ->
-                case dict:find({Table_1, Key_1}, TranList) of
+                case dict:find({Table_1, Key_1, Method_1}, TranList) of
                     {ok, RetL} ->
                         MonRefL = exclude_monitor_ref(RetL, MonitorRef, []),
-                        dict:store({Table_1, Key_1}, MonRefL, TranList);
+                        dict:store({Table_1, Key_1, Method_1}, MonRefL, TranList);
                     _ ->
                         TranList
                 end;
@@ -285,7 +292,7 @@ send_reume_to_waiting_procs([], MonList) ->
     {ok, MonList};
 send_reume_to_waiting_procs([{MonitorRef,_,_}|Rest], MonList) ->
     MonList_1 = case dict:find(MonitorRef, MonList) of
-                    {ok,{_Table,_Key,_From,ChildPid,_StartedAt}} ->
+                    {ok,{_Table,_Key,_Method,_From,ChildPid,_StartedAt}} ->
                         ok = leo_tran_handler:resume(ChildPid, MonitorRef),
                         dict:erase(MonitorRef, MonList);
                     _ ->
@@ -297,7 +304,7 @@ send_reume_to_waiting_procs([{MonitorRef,_,_}|Rest], MonList) ->
 %% @doc Retrieve a monitor-list
 %% @private
 get_monitor_ref(null, ChildPid, MonitorList) ->
-    lists:foldl(fun({MonitorRef, {_Table,_Key,_From,_ChildPid,_Clock}}, SoFar) ->
+    lists:foldl(fun({MonitorRef, {_Table,_Key,_Method,_From,_ChildPid,_Clock}}, SoFar) ->
                         case _ChildPid of
                             ChildPid ->
                                 MonitorRef;

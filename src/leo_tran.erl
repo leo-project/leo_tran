@@ -22,11 +22,12 @@
 -module(leo_tran).
 -author('Yosuke Hara').
 
+-include("leo_tran.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 %% Application callbacks
--export([run/3, run/4,
-         state/2,
+-export([run/4, run/5,
+         state/3,
          all_states/0
         ]).
 
@@ -35,30 +36,33 @@
 %% ===================================================================
 %% @doc Execute a taransaction
 %%
--spec(run(Tbl, Key, Callback) ->
+-spec(run(Tbl, Key, Method, Callback) ->
              ok | {error, any()} when Tbl::atom(),
                                       Key::any(),
+                                      Method::atom(),
                                       Callback::module()).
-run(Tbl, Key, Callback) ->
-    run(Tbl, Key, Callback, []).
+run(Tbl, Key, Method, Callback) ->
+    run(Tbl, Key, Method, Callback, []).
 
--spec(run(Tbl, Key, Callback, Timeout) ->
+-spec(run(Tbl, Key, Method, Callback, Options) ->
              ok | {error, any()} when Tbl::atom(),
                                       Key::any(),
+                                      Method::atom(),
                                       Callback::module(),
-                                      Timeout::pos_integer()).
-run(Tbl, Key, Callback, Options) ->
-    leo_tran_container:run(Tbl, Key, Callback, Options).
+                                      Options::[{tran_prop(), integer()|boolean()}]).
+run(Tbl, Key, Method, Callback, Options) ->
+    leo_tran_container:run(Tbl, Key, Method, Callback, Options).
 
 
 %% @doc Retrieve state of the transaction
 %%
--spec(state(Tbl, Key) ->
+-spec(state(Tbl, Key, Method) ->
              {ok, State} | {error, any()} when Tbl::atom(),
                                                Key::any(),
+                                               Method::atom(),
                                                State::running | not_running).
-state(Tbl, Key) ->
-    leo_tran_container:state(Tbl, Key).
+state(Tbl, Key, Method) ->
+    leo_tran_container:state(Tbl, Key, Method).
 
 
 %% @doc Retrieve all state of the transactions

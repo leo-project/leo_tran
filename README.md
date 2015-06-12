@@ -26,13 +26,14 @@ First, a callback program is as below:
 ```erlang
 %% Launch leo_tran:
 ok = application:start(leo_tran).
-{value, {ok, Ret_1}} = leo_tran:run(<<"TABLE">>, <<"ID">>, leo_tran_handler_sample).
+Method = get,
+{value, {ok, Ret_1}} = leo_tran:run(<<"TABLE">>, <<"ID">>, Method, leo_tran_handler_sample).
 
 %% Able to control a transaction by options:
 %%     - Default timeout: 5000 (ms)
 %%     - Default is_wait_for_tran: true
 %%     - Default is_lock_tran: true
-{value, {ok, Ret_2}} = leo_tran:run(<<"TABLE">>, <<"ID">>, leo_tran_handler_sample,
+{value, {ok, Ret_2}} = leo_tran:run(<<"TABLE">>, <<"ID">>, Method, leo_tran_handler_sample,
                                    [{?PROP_TIMEOUT, timer:seconds(1)},
                                     {?PROP_IS_WAIT_FOR_TRAN, true},
                                     {?PROP_IS_LOCK_TRAN, true}
@@ -41,58 +42,59 @@ ok = application:start(leo_tran).
 %% A Callback Module:
 -module(leo_tran_handler_sample).
 -behaviour(leo_tran_behaviour).
-
 -include("leo_tran.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([run/3, wait/3, resume/3,
-         commit/3, rollback/4
-       ]).
+-export([run/4, wait/4, resume/4,
+         commit/4, rollback/5]).
 
 -define(MIN_DURATION, timer:seconds(1)).
 
-
-%% @doc Launch a transaction
--spec(run(Table::atom(), Key::binary(), State::#tran_state{}) ->
+-spec(run(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
              ok | {error, any()}).
-run(Table, Key, State) ->
-    ?debugFmt("=> RUN - START: ~w, ~p, ~w",
+run(Table, Key, get, State) ->
+    ?debugFmt("GET: ~w, ~p, ~w",
               [Table, Key, State#tran_state.started_at]),
-    Duration = erlang:phash2(leo_date:clock(), timer:seconds(3)) + ?MIN_DURATION,
-    timer:sleep(Duration),
-    ?debugFmt("<= RUN - END: ~w, ~p, ~w",
+    ok;
+run(Table, Key, put, State) ->
+    ?debugFmt("PUT: ~w, ~p, ~w",
               [Table, Key, State#tran_state.started_at]),
-    ok.
-
-%% @doc Waiting for a transaction,
-%%      after finished the transaction, leo_tran executes resume-function
--spec(wait(Table::atom(), Key::binary(), State::#tran_state{}) ->
-             ok | {error, any()}).
-wait(Table, Key, State) ->
-    ?debugFmt("* WAIT: ~w, ~p, ~w",
+    ok;
+run(Table, Key, delete, State) ->
+    ?debugFmt("DELETE: ~w, ~p, ~w",
               [Table, Key, State#tran_state.started_at]),
-    ok.
-
-%% @doc Previous status is "waiting"
--spec(resume(Table::atom(), Key::binary(), State::#tran_state{}) ->
-             ok | {error, any()}).
-resume(Table, Key,_State) ->
-    ?debugFmt("* RESUME: ~w, ~p", [Table, Key]),
+    ok;
+run(_,_,_,_) ->
     ok.
 
 
-%% @doc If a transaction was successful, leo_tran calls commit-function
--spec(commit(Table::atom(), Key::binary(), State::#tran_state{}) ->
+-spec(wait(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
              ok | {error, any()}).
-commit(Table, Key,_State) ->
-    ?debugFmt("* COMMIT: ~w, ~p", [Table, Key]),
+wait(Table, Key, Method, State) ->
+    ?debugFmt("* WAIT: ~w, ~p, ~w, ~w",
+              [Table, Key, Method, State#tran_state.started_at]),
     ok.
 
-%% @doc If a transaction failed, leo_tran calls rollback-function
--spec(rollback(Table::atom(), Key::binary(), Reason::any(), State::#tran_state{}) ->
+
+-spec(resume(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
              ok | {error, any()}).
-rollback(Table, Key, Reason,_State) ->
-    ?debugFmt("* ROLLBACK: ~w, ~p, ~p", [Table, Key, Reason]),
+resume(Table, Key, Method,_State) ->
+    ?debugFmt("=> RESUME: ~w, ~p, ~w", [Table, Key, Method]),
+    ok.
+
+
+-spec(commit(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
+             ok | {error, any()}).
+commit(Table, Key, Method,_State) ->
+    ?debugFmt("===> COMMIT: ~w, ~p, ~w", [Table, Key, Method]),
+    ok.
+
+
+-spec(rollback(Table::atom(), Key::binary(), Method::atom(),
+               Reason::any(), State::#tran_state{}) ->
+             ok | {error, any()}).
+rollback(Table, Key, Method, Reason,_State) ->
+    ?debugFmt("===> ROLLBACK: ~w, ~p, ~w, ~p", [Table, Key, Method, Reason]),
     ok.
 ```
 

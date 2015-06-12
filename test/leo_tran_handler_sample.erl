@@ -27,48 +27,50 @@
 -include("leo_tran.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([run/3, wait/3, resume/3,
-         commit/3, rollback/4
+-export([run/4, wait/4, resume/4,
+         commit/4, rollback/5
        ]).
 
 -define(MIN_DURATION, timer:seconds(1)).
 
--spec(run(Table::atom(), Key::binary(), State::#tran_state{}) ->
+-spec(run(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
              ok | {error, any()}).
-run(Table, Key, State) ->
-    ?debugFmt(">>> RUN - START: ~w, ~p, ~w",
-              [Table, Key, State#tran_state.started_at]),
+run(Table, Key, get = Method, State) ->
+    ?debugFmt(">>> RUN - START: ~w, ~p, ~w, ~w",
+              [Table, Key, Method, State#tran_state.started_at]),
     Duration = erlang:phash2(leo_date:clock(), timer:seconds(3)) + ?MIN_DURATION,
     timer:sleep(Duration),
-    ?debugFmt("<<< RUN - END: ~w, ~p, ~w",
-              [Table, Key, State#tran_state.started_at]),
+    ?debugFmt("<<< RUN - END: ~w, ~p, ~w, ~w",
+              [Table, Key, Method, State#tran_state.started_at]),
+    ok;
+run(_Table,_Key,_Method,_State) ->
     ok.
 
 
--spec(wait(Table::atom(), Key::binary(), State::#tran_state{}) ->
+-spec(wait(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
              ok | {error, any()}).
-wait(Table, Key, State) ->
-    ?debugFmt("* WAIT: ~w, ~p, ~w",
-              [Table, Key, State#tran_state.started_at]),
+wait(Table, Key, Method, State) ->
+    ?debugFmt("* WAIT: ~w, ~p, ~w, ~w",
+              [Table, Key, Method, State#tran_state.started_at]),
     ok.
 
 
--spec(resume(Table::atom(), Key::binary(), State::#tran_state{}) ->
+-spec(resume(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
              ok | {error, any()}).
-resume(Table, Key,_State) ->
-    ?debugFmt("=> RESUME: ~w, ~p", [Table, Key]),
+resume(Table, Key, Method,_State) ->
+    ?debugFmt("=> RESUME: ~w, ~p, ~w", [Table, Key, Method]),
     ok.
 
 
--spec(commit(Table::atom(), Key::binary(), State::#tran_state{}) ->
+-spec(commit(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
              ok | {error, any()}).
-commit(Table, Key,_State) ->
-    ?debugFmt("===> COMMIT: ~w, ~p", [Table, Key]),
+commit(Table, Key, Method,_State) ->
+    ?debugFmt("===> COMMIT: ~w, ~p, ~w", [Table, Key, Method]),
     ok.
 
 
--spec(rollback(Table::atom(), Key::binary(), Reason::any(), State::#tran_state{}) ->
+-spec(rollback(Table::atom(), Key::binary(), Method::atom(), Reason::any(), State::#tran_state{}) ->
              ok | {error, any()}).
-rollback(Table, Key, Reason,_State) ->
-    ?debugFmt("===> ROLLBACK: ~w, ~p, ~p", [Table, Key, Reason]),
+rollback(Table, Key, Method, Reason,_State) ->
+    ?debugFmt("===> ROLLBACK: ~w, ~p, ~w, ~p", [Table, Key, Method, Reason]),
     ok.

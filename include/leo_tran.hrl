@@ -41,6 +41,7 @@
 -record(tran_state, {
           table :: atom(),
           key = <<>> :: any(),
+          method :: atom(),
           is_lock_tran     = false :: boolean(),
           is_wait_for_tran = false :: boolean(),
           state :: tran_state(),

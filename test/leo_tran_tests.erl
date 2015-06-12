@@ -50,42 +50,42 @@ suite() ->
     ?debugFmt("### Start a transaction ###", []),
     Table = test,
     Key = <<"KEY">>,
+    Method = get,
     Callback = leo_tran_handler_sample,
-    ok = send_tran(72, Table, Key, Callback),
+    ok = send_tran(72, Table, Key, Method, Callback),
     ?debugFmt("### Finished to send messages ###", []),
 
     timer:sleep(timer:seconds(10)),
-    {ok, not_running} = leo_tran:state(Table, Key),
+    {ok, not_running} = leo_tran:state(Table, Key, Method),
     ok.
 
-send_tran(0, Table, Key,_Callback) ->
+send_tran(0, Table, Key, Method, _Callback) ->
     timer:sleep(30),
-    {ok, running} = leo_tran:state(Table, Key),
-    {ok,[{test,<<"KEY">>}]} = leo_tran:all_states(),
+    {ok, running} = leo_tran:state(Table, Key, Method),
+    {ok,[{Table, Key, Method}]} = leo_tran:all_states(),
     ok;
-send_tran(Index, Table, Key, Callback) ->
+send_tran(Index, Table, Key, Method, Callback) ->
     case Index rem 3 of
         0 ->
             spawn(fun() ->
-                          {value, ok} = leo_tran:run(Table, Key, Callback)
+                          {value, ok} = leo_tran:run(Table, Key, Method, Callback)
                   end);
         1 ->
             spawn(fun() ->
                           timeout = leo_tran:run(
-                                      Table, Key, Callback, [{?PROP_TIMEOUT, 100},
-                                                             {?PROP_IS_WAIT_FOR_TRAN, true}
-                                                            ])
+                                      Table, Key, Method, Callback, [{?PROP_TIMEOUT, 100},
+                                                                     {?PROP_IS_WAIT_FOR_TRAN, true}
+                                                                    ])
                   end);
         2 ->
             spawn(fun() ->
                           {error, ?ERROR_ALREADY_HAS_TRAN} =
                               leo_tran:run(
-                                Table, Key, Callback, [{?PROP_TIMEOUT, timer:seconds(10)},
-                                                       {?PROP_IS_WAIT_FOR_TRAN, false}
-                                                      ])
+                                Table, Key, Method, Callback, [{?PROP_TIMEOUT, timer:seconds(10)},
+                                                               {?PROP_IS_WAIT_FOR_TRAN, false}
+                                                              ])
                   end)
     end,
-
-    send_tran(Index - 1, Table, Key, Callback).
+    send_tran(Index - 1, Table, Key, Method, Callback).
 
 -endif.
