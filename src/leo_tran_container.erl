@@ -175,7 +175,7 @@ handle_call({state, Table, Key, Method},_From, #state{tran_list = TranList} = St
     {reply, {ok, Ret}, State};
 
 handle_call(all_states,_From, #state{tran_list = TranList} = State) ->
-    RetL = case dict:is_empty(TranList) of
+    RetL = case (dict:size(TranList) == 0) of
                true ->
                    [];
                false ->
