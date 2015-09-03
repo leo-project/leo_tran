@@ -45,11 +45,18 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    ChildSpec = {leo_tran_container,
+    CS4TranContainer = {leo_tran_container,
                  {leo_tran_container, start_link, []},
                  permanent,
                  ?SHUTDOWN_WAITING_TIME,
                  worker,
                  [leo_tran_container]},
-    {ok, { {one_for_one, ?MAX_RESTART, ?MAX_TIME}, [ChildSpec]} }.
+    CS4ConcurrentContainer = {leo_tran_concurrent_container,
+                 {leo_tran_concurrent_container, start_link, []},
+                 permanent,
+                 ?SHUTDOWN_WAITING_TIME,
+                 worker,
+                 [leo_tran_concurrent_container]},
+
+    {ok, { {one_for_one, ?MAX_RESTART, ?MAX_TIME}, [CS4TranContainer, CS4ConcurrentContainer]} }.
 

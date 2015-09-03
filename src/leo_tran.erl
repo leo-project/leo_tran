@@ -28,7 +28,8 @@
 %% Application callbacks
 -export([run/4, run/5,
          state/3,
-         all_states/0
+         all_states/0,
+         wait/3, notify_all/3
         ]).
 
 %% ===================================================================
@@ -74,3 +75,22 @@ state(Tbl, Key, Method) ->
                                  State::running | not_running).
 all_states() ->
     leo_tran_container:all_states().
+
+%% @doc Block the caller process until notify_all/3 is called from another process
+%%
+-spec(wait(Table, Key, Method) ->
+             ok | {error, any()} when Table::atom(),
+                                      Key::any(),
+                                      Method::atom()).
+wait(Table, Key, Method) ->
+    leo_tran_concurrent_container:wait(Table, Key, Method).
+
+%% @doc Resume all blocked processes invoking wait/3
+%%
+-spec(notify_all(Table, Key, Method) ->
+             ok | {error, any()} when Table::atom(),
+                                      Key::any(),
+                                      Method::atom()).
+notify_all(Table, Key, Method) ->
+    leo_tran_concurrent_container:notify_all(Table, Key, Method).
+

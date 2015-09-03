@@ -31,6 +31,9 @@
 %%--------------------------------------------------------------------
 -ifdef(EUNIT).
 
+%% To avoid unused warning
+-export([wait_proc/4]).
+
 all_delete_test_() ->
     {setup,
      fun ( ) ->
@@ -43,7 +46,9 @@ all_delete_test_() ->
      end,
      [
       {"test compaction",
-       {timeout, 1000, fun suite/0}}
+       {timeout, 10000, fun suite/0}},
+      {"test wait/notify functionality",
+       {timeout, 10000, fun wait_notify_simple/0}}
      ]}.
 
 suite() ->
@@ -87,5 +92,34 @@ send_tran(Index, Table, Key, Method, Callback) ->
                   end)
     end,
     send_tran(Index - 1, Table, Key, Method, Callback).
+
+wait_proc(Parent, K, V, M) ->
+    proc_lib:init_ack(Parent, ok),
+    leo_tran_concurrent_container:wait(K, V, M).
+
+wait_notify_simple() ->
+    NumProc = 100,
+    BeforeProcs = erlang:processes(),
+    [proc_lib:start(?MODULE, wait_proc, [self(), key, val, method]) || _Seq <- lists:seq(1, NumProc)],
+    MiddleProcs = erlang:processes(),
+    [proc_lib:start(?MODULE, wait_proc, [self(), key, val, func]) || _Seq <- lists:seq(1, NumProc)],
+    AfterProcs = erlang:processes(),
+    NumBefore = length(BeforeProcs),
+    NumAfter = length(AfterProcs),
+    NumAfter = NumBefore + NumProc * 2,
+    timer:sleep(3000),
+    AfterProcs = erlang:processes(),
+    leo_tran_concurrent_container:notify_all(key, val, null), % nop
+    timer:sleep(1000),
+    AfterProcs = erlang:processes(),
+    leo_tran_concurrent_container:notify_all(key, val, func),
+    timer:sleep(1000),
+    MiddleProcs = erlang:processes(),
+    leo_tran_concurrent_container:notify_all(key, val, method),
+    timer:sleep(1000),
+    BeforeProcs = erlang:processes(),
+    ok.
+
+
 
 -endif.
