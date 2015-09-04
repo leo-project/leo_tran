@@ -30,7 +30,10 @@
 %% TEST FUNCTIONS
 %%--------------------------------------------------------------------
 -ifdef(EUNIT).
-
+-behaviour(leo_tran_behaviour).
+-export([run/4, wait/4, resume/4,
+         commit/4, rollback/5
+       ]).
 %% To avoid unused warning
 -export([wait_proc/4]).
 
@@ -48,7 +51,8 @@ all_delete_test_() ->
       {"test compaction",
        {timeout, 10000, fun suite/0}},
       {"test wait/notify functionality",
-       {timeout, 10000, fun wait_notify_simple/0}}
+       {timeout, 10000, fun wait_notify/0}},
+      fun tran_exclusive_lock/0
      ]}.
 
 suite() ->
@@ -97,7 +101,7 @@ wait_proc(Parent, K, V, M) ->
     proc_lib:init_ack(Parent, ok),
     leo_tran_concurrent_container:wait(K, V, M).
 
-wait_notify_simple() ->
+wait_notify() ->
     NumProc = 100,
     BeforeProcs = erlang:processes(),
     [proc_lib:start(?MODULE, wait_proc, [self(), key, val, method]) || _Seq <- lists:seq(1, NumProc)],
@@ -121,5 +125,47 @@ wait_notify_simple() ->
     ok.
 
 
+tran_exclusive_lock_recv(0, OK, NG) ->
+    {OK, NG};
+tran_exclusive_lock_recv(N, OK, NG) ->
+    receive
+        ok ->
+            tran_exclusive_lock_recv(N - 1, OK + 1, NG);
+        ng ->
+            tran_exclusive_lock_recv(N - 1, OK, NG + 1);
+        Unknown ->
+            io:format(user, "[error] Received an unknown message:~p~n", [Unknown]),
+            tran_exclusive_lock_recv(N - 1, OK, NG)
+    end.
+
+tran_exclusive_lock() ->
+    Parent = self(),
+    [
+        spawn(fun() ->
+            case leo_tran:run(
+                tran, exclusive, lock, ?MODULE, [{?PROP_IS_WAIT_FOR_TRAN, false}]) of
+                {error, ?ERROR_ALREADY_HAS_TRAN} ->
+                    Parent ! ng;
+                {value, ok} ->
+                    Parent ! ok;
+                _Other ->
+                    Parent ! _Other
+            end
+        end) || _ <- lists:seq(1, 10)
+    ],
+    {1, 9} = tran_exclusive_lock_recv(10, 0, 0),
+    ok.
+%% Callbacks for leo_tran_behaviour
+run(_Table,_Key,_Method,_State) ->
+    timer:sleep(1000),
+    ok.
+resume(_Table,_Key,_Method,_State) ->
+    ok.
+wait(_Table,_Key,_Method,_State) ->
+    ok.
+commit(_Table,_Key,_Method,_State) ->
+    ok.
+rollback(_Table,_Key,_Method,_Reason,_State) ->
+    ok.
 
 -endif.
