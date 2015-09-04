@@ -32,7 +32,7 @@
          stop/0]).
 
 %% data operations.
--export([run/5,
+-export([run/6,
          state/3,
          all_states/0
         ]).
@@ -71,14 +71,15 @@ stop() ->
 %%--------------------------------------------------------------------
 %% @doc Run a transaction
 %%
--spec(run(Table, Key, Method, Callback, Options) ->
+-spec(run(Table, Key, Method, Callback, UserContext, Options) ->
              ok | {error, any()} when Table::atom(),
                                       Key::any(),
                                       Method::atom(),
                                       Callback::module(),
+                                      UserContext::any(),
                                       Options::[{tran_prop(), any()}]).
-run(Table, Key, Method, Callback, Options) ->
-    gen_server:call(?MODULE, {run, Table, Key, Method, Callback, Options}, ?DEF_TIMEOUT).
+run(Table, Key, Method, Callback, UserContext, Options) ->
+    gen_server:call(?MODULE, {run, Table, Key, Method, Callback, UserContext, Options}, ?DEF_TIMEOUT).
 
 
 %% @doc Retrieve a state by the table and the key
@@ -119,7 +120,7 @@ handle_call(stop, _From, State) ->
 %%--------------------------------------------------------------------
 %% Data Operation related.
 %%--------------------------------------------------------------------
-handle_call({run, Table, Key, Method, Callback, Options},
+handle_call({run, Table, Key, Method, Callback, UserContext, Options},
             From, #state{monitor_list = MonitorList,
                          tran_list = TranList} = State) ->
     %%  Check already started transaction(s)
@@ -139,7 +140,7 @@ handle_call({run, Table, Key, Method, Callback, Options},
     case CanStartTran of
         true ->
             case leo_tran_handler:start_link(self(), Table, Key,
-                                             Method, Callback, Options) of
+                                             Method, Callback, UserContext, Options) of
                 {ok, ChildPid} ->
                     MonitorRef = erlang:monitor(process, ChildPid),
                     Clock = leo_date:clock(),

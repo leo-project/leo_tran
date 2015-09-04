@@ -28,8 +28,8 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %% API
--export([start_link/5,
-         start_link/6,
+-export([start_link/6,
+         start_link/7,
          stop/1]).
 
 %% data operations.
@@ -53,6 +53,7 @@
                 key = <<>> :: binary(),
                 method :: atom(),
                 callback :: module(),
+                user_context :: any(),
                 timeout = 0 :: non_neg_integer(),
                 started_at = -1 :: integer()
                }).
@@ -63,24 +64,26 @@
 %% API
 %%--------------------------------------------------------------------
 %% @doc Creates the gen_server process as part of a supervision tree
--spec(start_link(Container, Table, Key, Method, Callback) ->
+-spec(start_link(Container, Table, Key, Method, Callback, UserContext) ->
              {ok,pid()} | ignore | {error, any()} when Container::pid(),
                                                        Table::atom(),
                                                        Key::binary(),
                                                        Method::atom(),
+                                                       UserContext::any(),
                                                        Callback::module()).
-start_link(Container, Table, Key, Method, Callback) ->
-    start_link(Container, Table, Key, Method, Callback, [{timeout, ?DEF_TIMEOUT}]).
+start_link(Container, Table, Key, Method, Callback, UserContext) ->
+    start_link(Container, Table, Key, Method, Callback, UserContext, [{timeout, ?DEF_TIMEOUT}]).
 
--spec(start_link(Container, Table, Key, Method, Callback, Options) ->
+-spec(start_link(Container, Table, Key, Method, Callback, UserContext, Options) ->
              {ok,pid()} | ignore | {error, any()} when Container::pid(),
                                                        Table::atom(),
                                                        Key::binary(),
                                                        Method::atom(),
                                                        Callback::module(),
+                                                       UserContext::any(),
                                                        Options::[{tran_prop(), any()}]).
-start_link(Container, Table, Key, Method, Callback, Options) ->
-    gen_server:start_link(?MODULE, [Container, Table, Key, Method, Callback, Options], []).
+start_link(Container, Table, Key, Method, Callback, UserContext, Options) ->
+    gen_server:start_link(?MODULE, [Container, Table, Key, Method, Callback, UserContext, Options], []).
 
 %% @doc Stop this server
 -spec(stop(PId) ->
@@ -117,13 +120,14 @@ resume(PId, MonitorRef) ->
 %% GEN_SERVER CALLBACKS
 %%--------------------------------------------------------------------
 %% @doc gen_server callback - Module:init(Args) -> Result
-init([Container, Table, Key, Method, Callback, Options]) ->
+init([Container, Table, Key, Method, Callback, UserContext, Options]) ->
     Timeout = leo_misc:get_value('timeout', Options, ?DEF_TIMEOUT),
     {ok, #state{container = Container,
                 table = Table,
                 key = Key,
                 method = Method,
                 callback = Callback,
+                user_context = UserContext,
                 started_at = leo_date:clock(),
                 timeout = Timeout}, Timeout}.
 
@@ -146,21 +150,22 @@ handle_cast({Msg, MonitorRef}, #state{container = Container,
                                       key = Key,
                                       method = Method,
                                       callback = Callback,
+                                      user_context = UserContext,
                                       timeout = Timeout} = State) when Msg == run orelse
                                                                        Msg == resume ->
     Reply = case catch erlang:apply(Callback, Msg,
-                                    [Table, Key, Method, state_to_tran_state(State)]) of
+                                    [Table, Key, Method, UserContext, state_to_tran_state(State)]) of
                 {'EXIT', Cause} ->
                     ok = erlang:apply(Callback, rollback,
-                                      [Table, Key, Method, Cause, state_to_tran_state(State)]),
+                                      [Table, Key, Method, UserContext, Cause, state_to_tran_state(State)]),
                     {badtran, Cause};
                 Ret ->
                     case (Ret == ok orelse
                           erlang:element(1, Ret) == ok) of
                         true ->
-                            ok = erlang:apply(Callback, commit, [Table, Key, Method, State]);
+                            ok = erlang:apply(Callback, commit, [Table, Key, Method, UserContext, State]);
                         false ->
-                            ok = erlang:apply(Callback, rollback, [Table, Key, Method, Ret, State])
+                            ok = erlang:apply(Callback, rollback, [Table, Key, Method, UserContext, Ret, State])
                     end,
                     {value, Ret}
             end,
@@ -174,9 +179,10 @@ handle_cast({wait,_MonitorRef}, #state{container = Container,
                                        key = Key,
                                        method = Method,
                                        callback = Callback,
+                                       user_context = UserContext,
                                        timeout = Timeout} = State) ->
     Reply = case catch erlang:apply(Callback, wait,
-                                    [Table, Key, Method, state_to_tran_state(State)]) of
+                                    [Table, Key, Method, UserContext, state_to_tran_state(State)]) of
                 {'EXIT', Cause} ->
                     {error, Cause};
                 Ret ->

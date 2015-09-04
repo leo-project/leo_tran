@@ -31,8 +31,8 @@
 %%--------------------------------------------------------------------
 -ifdef(EUNIT).
 -behaviour(leo_tran_behaviour).
--export([run/4, wait/4, resume/4,
-         commit/4, rollback/5
+-export([run/5, wait/5, resume/5,
+         commit/5, rollback/6
        ]).
 %% To avoid unused warning
 -export([wait_proc/4]).
@@ -77,22 +77,22 @@ send_tran(Index, Table, Key, Method, Callback) ->
     case Index rem 3 of
         0 ->
             spawn(fun() ->
-                          {value, ok} = leo_tran:run(Table, Key, Method, Callback)
+                          {value, ok} = leo_tran:run(Table, Key, Method, Callback, null)
                   end);
         1 ->
             spawn(fun() ->
                           timeout = leo_tran:run(
-                                      Table, Key, Method, Callback, [{?PROP_TIMEOUT, 100},
-                                                                     {?PROP_IS_WAIT_FOR_TRAN, true}
-                                                                    ])
+                                      Table, Key, Method, Callback, null, [{?PROP_TIMEOUT, 100},
+                                                                           {?PROP_IS_WAIT_FOR_TRAN, true}
+                                                                          ])
                   end);
         2 ->
             spawn(fun() ->
                           {error, ?ERROR_ALREADY_HAS_TRAN} =
                               leo_tran:run(
-                                Table, Key, Method, Callback, [{?PROP_TIMEOUT, timer:seconds(10)},
-                                                               {?PROP_IS_WAIT_FOR_TRAN, false}
-                                                              ])
+                                Table, Key, Method, Callback, null, [{?PROP_TIMEOUT, timer:seconds(10)},
+                                                                    {?PROP_IS_WAIT_FOR_TRAN, false}
+                                                                   ])
                   end)
     end,
     send_tran(Index - 1, Table, Key, Method, Callback).
@@ -143,7 +143,7 @@ tran_exclusive_lock() ->
     [
         spawn(fun() ->
             case leo_tran:run(
-                tran, exclusive, lock, ?MODULE, [{?PROP_IS_WAIT_FOR_TRAN, false}]) of
+                tran, exclusive, lock, ?MODULE, null, [{?PROP_IS_WAIT_FOR_TRAN, false}]) of
                 {error, ?ERROR_ALREADY_HAS_TRAN} ->
                     Parent ! ng;
                 {value, ok} ->
@@ -156,16 +156,16 @@ tran_exclusive_lock() ->
     {1, 9} = tran_exclusive_lock_recv(10, 0, 0),
     ok.
 %% Callbacks for leo_tran_behaviour
-run(_Table,_Key,_Method,_State) ->
+run(_Table,_Key,_Method,null,_State) ->
     timer:sleep(1000),
     ok.
-resume(_Table,_Key,_Method,_State) ->
+resume(_Table,_Key,_Method,null,_State) ->
     ok.
-wait(_Table,_Key,_Method,_State) ->
+wait(_Table,_Key,_Method,null,_State) ->
     ok.
-commit(_Table,_Key,_Method,_State) ->
+commit(_Table,_Key,_Method,null,_State) ->
     ok.
-rollback(_Table,_Key,_Method,_Reason,_State) ->
+rollback(_Table,_Key,_Method,null,_Reason,_State) ->
     ok.
 
 -endif.

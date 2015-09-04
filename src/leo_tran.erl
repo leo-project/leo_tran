@@ -26,7 +26,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 %% Application callbacks
--export([run/4, run/5,
+-export([run/5, run/6,
          state/3,
          all_states/0,
          wait/3, notify_all/3
@@ -37,22 +37,24 @@
 %% ===================================================================
 %% @doc Execute a taransaction
 %%
--spec(run(Tbl, Key, Method, Callback) ->
+-spec(run(Tbl, Key, Method, Callback, UserContext) ->
              ok | {error, any()} when Tbl::atom(),
                                       Key::any(),
                                       Method::atom(),
+                                      UserContext::any(),
                                       Callback::module()).
-run(Tbl, Key, Method, Callback) ->
-    run(Tbl, Key, Method, Callback, []).
+run(Tbl, Key, Method, Callback, UserContext) ->
+    run(Tbl, Key, Method, Callback, UserContext, []).
 
--spec(run(Tbl, Key, Method, Callback, Options) ->
+-spec(run(Tbl, Key, Method, Callback, UserContext, Options) ->
              ok | {error, any()} when Tbl::atom(),
                                       Key::any(),
                                       Method::atom(),
                                       Callback::module(),
+                                      UserContext::any(),
                                       Options::[{tran_prop(), integer()|boolean()}]).
-run(Tbl, Key, Method, Callback, Options) ->
-    leo_tran_container:run(Tbl, Key, Method, Callback, Options).
+run(Tbl, Key, Method, Callback, UserContext, Options) ->
+    leo_tran_container:run(Tbl, Key, Method, Callback, UserContext, Options).
 
 
 %% @doc Retrieve state of the transaction
