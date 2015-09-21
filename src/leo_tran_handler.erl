@@ -20,7 +20,6 @@
 %%
 %%======================================================================
 -module(leo_tran_handler).
--author('Yosuke Hara').
 
 -behaviour(gen_server).
 

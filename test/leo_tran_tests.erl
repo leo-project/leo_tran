@@ -99,7 +99,7 @@ send_tran(Index, Table, Key, Method, Callback) ->
 
 wait_proc(Parent, K, V, M) ->
     proc_lib:init_ack(Parent, ok),
-    leo_tran_concurrent_container:wait(K, V, M).
+    leo_tran:wait(K, V, M).
 
 wait_notify() ->
     NumProc = 100,
@@ -113,13 +113,13 @@ wait_notify() ->
     NumAfter = NumBefore + NumProc * 2,
     timer:sleep(3000),
     AfterProcs = erlang:processes(),
-    leo_tran_concurrent_container:notify_all(key, val, null), % nop
+    leo_tran:notify_all(key, val, null), % nop
     timer:sleep(1000),
     AfterProcs = erlang:processes(),
-    leo_tran_concurrent_container:notify_all(key, val, func),
+    leo_tran:notify_all(key, val, func),
     timer:sleep(1000),
     MiddleProcs = erlang:processes(),
-    leo_tran_concurrent_container:notify_all(key, val, method),
+    leo_tran:notify_all(key, val, method),
     timer:sleep(1000),
     BeforeProcs = erlang:processes(),
     ok.

@@ -20,7 +20,6 @@
 %%
 %%======================================================================
 -module(leo_tran).
--author('Yosuke Hara').
 
 -include("leo_tran.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -54,7 +53,7 @@ run(Tbl, Key, Method, Callback, UserContext) ->
                                       UserContext::any(),
                                       Options::[{tran_prop(), integer()|boolean()}]).
 run(Tbl, Key, Method, Callback, UserContext, Options) ->
-    leo_tran_container:run(Tbl, Key, Method, Callback, UserContext, Options).
+    leo_tran_serializable_cntnr:run(Tbl, Key, Method, Callback, UserContext, Options).
 
 
 %% @doc Retrieve state of the transaction
@@ -65,7 +64,7 @@ run(Tbl, Key, Method, Callback, UserContext, Options) ->
                                                Method::atom(),
                                                State::running | not_running).
 state(Tbl, Key, Method) ->
-    leo_tran_container:state(Tbl, Key, Method).
+    leo_tran_serializable_cntnr:state(Tbl, Key, Method).
 
 
 %% @doc Retrieve all state of the transactions
@@ -76,7 +75,8 @@ state(Tbl, Key, Method) ->
                                  Key::any(),
                                  State::running | not_running).
 all_states() ->
-    leo_tran_container:all_states().
+    leo_tran_serializable_cntnr:all_states().
+
 
 %% @doc Block the caller process until notify_all/3 is called from another process
 %%
@@ -85,7 +85,8 @@ all_states() ->
                                       Key::any(),
                                       Method::atom()).
 wait(Table, Key, Method) ->
-    leo_tran_concurrent_container:wait(Table, Key, Method).
+    leo_tran_concurrent_cntnr:wait(Table, Key, Method).
+
 
 %% @doc Resume all blocked processes invoking wait/3
 %%
@@ -94,5 +95,4 @@ wait(Table, Key, Method) ->
                                       Key::any(),
                                       Method::atom()).
 notify_all(Table, Key, Method) ->
-    leo_tran_concurrent_container:notify_all(Table, Key, Method).
-
+    leo_tran_concurrent_cntnr:notify_all(Table, Key, Method).

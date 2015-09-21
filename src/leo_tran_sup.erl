@@ -45,18 +45,18 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    CS4TranContainer = {leo_tran_container,
-                 {leo_tran_container, start_link, []},
-                 permanent,
-                 ?SHUTDOWN_WAITING_TIME,
-                 worker,
-                 [leo_tran_container]},
-    CS4ConcurrentContainer = {leo_tran_concurrent_container,
-                 {leo_tran_concurrent_container, start_link, []},
-                 permanent,
-                 ?SHUTDOWN_WAITING_TIME,
-                 worker,
-                 [leo_tran_concurrent_container]},
+    SerializableContainer = {leo_tran_serializable_cntnr,
+			     {leo_tran_serializable_cntnr, start_link, []},
+			     permanent,
+			     ?SHUTDOWN_WAITING_TIME,
+			     worker,
+			     [leo_tran_serializable_cntnr]},
+    ConcurrentContainer = {leo_tran_concurrent_cntnr,
+			   {leo_tran_concurrent_cntnr, start_link, []},
+			   permanent,
+			   ?SHUTDOWN_WAITING_TIME,
+			   worker,
+			   [leo_tran_concurrent_cntnr]},
 
-    {ok, { {one_for_one, ?MAX_RESTART, ?MAX_TIME}, [CS4TranContainer, CS4ConcurrentContainer]} }.
-
+    {ok, { {one_for_one, ?MAX_RESTART, ?MAX_TIME},
+	   [SerializableContainer, ConcurrentContainer]} }.

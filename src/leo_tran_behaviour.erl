@@ -20,7 +20,6 @@
 %%
 %%======================================================================
 -module(leo_tran_behaviour).
--author('Yosuke Hara').
 
 -include("leo_tran.hrl").
 

@@ -19,8 +19,7 @@
 %% under the License.
 %%
 %%======================================================================
--module(leo_tran_concurrent_container).
--author('Yosuke Hara').
+-module(leo_tran_concurrent_cntnr).
 
 -behaviour(gen_server).
 
@@ -45,7 +44,7 @@
          code_change/3
         ]).
 
--record(state, 
+-record(state,
         {
           wait_list = []
         }).
@@ -88,6 +87,7 @@ wait(Table, Key, Method) ->
 notify_all(Table, Key, Method) ->
     gen_server:call(?MODULE, {notify_all, Table, Key, Method}, ?DEF_TIMEOUT).
 
+
 %%--------------------------------------------------------------------
 %% GEN_SERVER CALLBACKS
 %%--------------------------------------------------------------------
@@ -109,8 +109,8 @@ handle_call({wait, Table, Key, Method},
     %% Add a caller process to wait list
     NewWaitList = dict:append({Table, Key, Method}, From, WaitList),
     {noreply, State#state{wait_list = NewWaitList}};
-    
-handle_call({notify_all, Table, Key, Method}, 
+
+handle_call({notify_all, Table, Key, Method},
             _From, #state{wait_list = WaitList} = State) ->
     case dict:find({Table, Key, Method}, WaitList) of
         {ok, PidList} ->
@@ -123,9 +123,11 @@ handle_call({notify_all, Table, Key, Method},
 handle_call(_Msg,_,State) ->
     {reply, ok, State}.
 
+
 %% @doc gen_server callback - Module:handle_cast(Request, State) -> Result
 handle_cast(_Msg, State) ->
     {noreply, State}.
+
 
 %% @doc gen_server callback - Module:handle_info(Info, State) -> Result
 handle_info(_Info, State) ->
@@ -142,6 +144,7 @@ handle_info(_Info, State) ->
 terminate(_Reason,_State) ->
     ok.
 
+
 %% @doc Convert process state when code is changed
 %% <p>
 %% gen_server callback - Module:code_change(OldVsn, State, Extra) -> {ok, NewState} | {error, Reason}.
@@ -153,6 +156,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %% INNER FUNCTIONS
 %%--------------------------------------------------------------------
-%% @doc Exclude a monitor reference from the monitor list
-%% @private
-

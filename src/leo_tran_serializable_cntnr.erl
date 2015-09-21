@@ -19,8 +19,7 @@
 %% under the License.
 %%
 %%======================================================================
--module(leo_tran_container).
--author('Yosuke Hara').
+-module(leo_tran_serializable_cntnr).
 
 -behaviour(gen_server).
 
@@ -60,6 +59,7 @@
              {ok,pid()} | ignore | {error, any()}).
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
 
 %% @doc Close the process
 stop() ->

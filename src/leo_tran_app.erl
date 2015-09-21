@@ -20,7 +20,6 @@
 %%
 %%======================================================================
 -module(leo_tran_app).
--author('Yosuke Hara').
 
 -behaviour(application).
 
