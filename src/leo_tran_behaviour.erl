@@ -18,25 +18,22 @@
 %% specific language governing permissions and limitations
 %% under the License.
 %%
-%% @doc The ordning-reda's behaviour.
-%% @end
 %%======================================================================
 -module(leo_tran_behaviour).
--author('Yosuke Hara').
 
 -include("leo_tran.hrl").
 
--callback(run(Table::atom(), Key::any(), State::#tran_state{}) ->
+-callback(run(Table::atom(), Key::any(), Method::atom(), UserContext::any(), State::#tran_state{}) ->
                  ok | {error, any()}).
 
--callback(wait(Table::atom(), Key::any(), State::#tran_state{}) ->
+-callback(wait(Table::atom(), Key::any(), Method::atom(), UserContext::any(), State::#tran_state{}) ->
                  ok | {error, any()}).
 
--callback(resume(Table::atom(), Key::any(), State::#tran_state{}) ->
+-callback(resume(Table::atom(), Key::any(), Method::atom(), UserContext::any(), State::#tran_state{}) ->
                  ok | {error, any()}).
 
--callback(commit(Table::atom(), Key::any(), State::#tran_state{}) ->
+-callback(commit(Table::atom(), Key::any(), Method::atom(), UserContext::any(), State::#tran_state{}) ->
                  ok | {error, any()}).
 
--callback(rollback(Table::atom(), Key::any(), Reason::any(), State::#tran_state{}) ->
+-callback(rollback(Table::atom(), Key::any(), Method::atom(), UserContext::any(), Reason::any(), State::#tran_state{}) ->
                  ok | {error, any()}).

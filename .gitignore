@@ -2,8 +2,8 @@
 deps/
 ebin/
 test/*.beam
-.leo_backend_db_dialyzer_plt
-leo_backend_db.dot
-leo_backend_db.png
+.leo_tran_dialyzer_plt
+leo_tran.dot
+leo_tran.png
 .rebar/
 doc/

@@ -18,20 +18,17 @@
 %% specific language governing permissions and limitations
 %% under the License.
 %%
-%% ---------------------------------------------------------------------
-%% @doc leo_trans
-%% @reference https://github.com/leo-project/leo_tran/blob/master/src/leo_tran.erl
-%% @end
 %%======================================================================
 -module(leo_tran).
--author('Yosuke Hara').
 
+-include("leo_tran.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 %% Application callbacks
--export([run/3, run/4,
-         state/2,
-         all_states/0
+-export([run/5, run/6,
+         state/3,
+         all_states/0,
+         wait/3, notify_all/3
         ]).
 
 %% ===================================================================
@@ -39,30 +36,35 @@
 %% ===================================================================
 %% @doc Execute a taransaction
 %%
--spec(run(Tbl, Key, Callback) ->
+-spec(run(Tbl, Key, Method, Callback, UserContext) ->
              ok | {error, any()} when Tbl::atom(),
                                       Key::any(),
+                                      Method::atom(),
+                                      UserContext::any(),
                                       Callback::module()).
-run(Tbl, Key, Callback) ->
-    run(Tbl, Key, Callback, []).
+run(Tbl, Key, Method, Callback, UserContext) ->
+    run(Tbl, Key, Method, Callback, UserContext, []).
 
--spec(run(Tbl, Key, Callback, Timeout) ->
+-spec(run(Tbl, Key, Method, Callback, UserContext, Options) ->
              ok | {error, any()} when Tbl::atom(),
                                       Key::any(),
+                                      Method::atom(),
                                       Callback::module(),
-                                      Timeout::pos_integer()).
-run(Tbl, Key, Callback, Options) ->
-    leo_tran_container:run(Tbl, Key, Callback, Options).
+                                      UserContext::any(),
+                                      Options::[{tran_prop(), integer()|boolean()}]).
+run(Tbl, Key, Method, Callback, UserContext, Options) ->
+    leo_tran_serializable_cntnr:run(Tbl, Key, Method, Callback, UserContext, Options).
 
 
 %% @doc Retrieve state of the transaction
 %%
--spec(state(Tbl, Key) ->
+-spec(state(Tbl, Key, Method) ->
              {ok, State} | {error, any()} when Tbl::atom(),
                                                Key::any(),
+                                               Method::atom(),
                                                State::running | not_running).
-state(Tbl, Key) ->
-    leo_tran_container:state(Tbl, Key).
+state(Tbl, Key, Method) ->
+    leo_tran_serializable_cntnr:state(Tbl, Key, Method).
 
 
 %% @doc Retrieve all state of the transactions
@@ -73,4 +75,24 @@ state(Tbl, Key) ->
                                  Key::any(),
                                  State::running | not_running).
 all_states() ->
-    leo_tran_container:all_states().
+    leo_tran_serializable_cntnr:all_states().
+
+
+%% @doc Block the caller process until notify_all/3 is called from another process
+%%
+-spec(wait(Table, Key, Method) ->
+             ok | {error, any()} when Table::atom(),
+                                      Key::any(),
+                                      Method::atom()).
+wait(Table, Key, Method) ->
+    leo_tran_concurrent_cntnr:wait(Table, Key, Method).
+
+
+%% @doc Resume all blocked processes invoking wait/3
+%%
+-spec(notify_all(Table, Key, Method) ->
+             ok | {error, any()} when Table::atom(),
+                                      Key::any(),
+                                      Method::atom()).
+notify_all(Table, Key, Method) ->
+    leo_tran_concurrent_cntnr:notify_all(Table, Key, Method).

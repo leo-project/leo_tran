@@ -2,10 +2,10 @@
 
 REBAR := ./rebar
 APPS = erts kernel stdlib sasl crypto compiler inets mnesia public_key runtime_tools snmp syntax_tools tools xmerl webtool ssl
-LIBS = deps/leo_commons/ebin deps/bitcask/ebin deps/eleveldb/ebin
-PLT_FILE = .leo_backend_db_dialyzer_plt
-DOT_FILE = leo_backend_db.dot
-CALL_GRAPH_FILE = leo_backend_db.png
+LIBS = deps/leo_commons/ebin
+PLT_FILE = .leo_tran_dialyzer_plt
+DOT_FILE = leo_tran.dot
+CALL_GRAPH_FILE = leo_tran.png
 
 all:
 	@$(REBAR) update-deps
@@ -27,7 +27,7 @@ build_plt:
 	dialyzer --build_plt --output_plt $(PLT_FILE) --apps $(APPS) $(LIBS)
 dialyzer:
 	@$(REBAR) compile
-	dialyzer -Wno_return --plt $(PLT_FILE) -r ebin/ --dump_callgraph $(DOT_FILE) | fgrep -v -f ./dialyzer.ignore-warnings
+	dialyzer -Wno_return --plt $(PLT_FILE) -r ebin/ --dump_callgraph $(DOT_FILE)
 typer:
 	typer --plt $(PLT_FILE) -I include/ -r src/
 doc: compile

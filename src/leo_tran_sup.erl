@@ -18,10 +18,6 @@
 %% specific language governing permissions and limitations
 %% under the License.
 %%
-%% ---------------------------------------------------------------------
-%% @doc leo_trans's app
-%% @reference https://github.com/leo-project/leo_tran/blob/master/src/leo_tran_sup.erl
-%% @end
 %%======================================================================
 -module(leo_tran_sup).
 
@@ -49,11 +45,18 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    ChildSpec = {leo_tran_container,
-                 {leo_tran_container, start_link, []},
-                 permanent,
-                 ?SHUTDOWN_WAITING_TIME,
-                 worker,
-                 [leo_tran_container]},
-    {ok, { {one_for_one, ?MAX_RESTART, ?MAX_TIME}, [ChildSpec]} }.
+    SerializableContainer = {leo_tran_serializable_cntnr,
+			     {leo_tran_serializable_cntnr, start_link, []},
+			     permanent,
+			     ?SHUTDOWN_WAITING_TIME,
+			     worker,
+			     [leo_tran_serializable_cntnr]},
+    ConcurrentContainer = {leo_tran_concurrent_cntnr,
+			   {leo_tran_concurrent_cntnr, start_link, []},
+			   permanent,
+			   ?SHUTDOWN_WAITING_TIME,
+			   worker,
+			   [leo_tran_concurrent_cntnr]},
 
+    {ok, { {one_for_one, ?MAX_RESTART, ?MAX_TIME},
+	   [SerializableContainer, ConcurrentContainer]} }.
