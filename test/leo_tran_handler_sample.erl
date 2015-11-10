@@ -20,7 +20,6 @@
 %%
 %%======================================================================
 -module(leo_tran_handler_sample).
--author('Yosuke Hara').
 
 -behaviour(leo_tran_behaviour).
 
