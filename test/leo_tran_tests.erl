@@ -20,7 +20,6 @@
 %%
 %%====================================================================
 -module(leo_tran_tests).
--author('Yosuke Hara').
 
 -include("leo_tran.hrl").
 -include_lib("eunit/include/eunit.hrl").

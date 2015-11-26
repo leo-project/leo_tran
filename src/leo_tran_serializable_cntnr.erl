@@ -31,7 +31,7 @@
          stop/0]).
 
 %% data operations.
--export([run/6,
+-export([run/6, run/7,
          state/3,
          all_states/0
         ]).
@@ -79,7 +79,18 @@ stop() ->
                                       UserContext::any(),
                                       Options::[{tran_prop(), any()}]).
 run(Table, Key, Method, Callback, UserContext, Options) ->
-    gen_server:call(?MODULE, {run, Table, Key, Method, Callback, UserContext, Options}, ?DEF_TIMEOUT).
+    run(Table, Key, Method, Callback, UserContext, Options, ?DEF_TIMEOUT).
+
+-spec(run(Table, Key, Method, Callback, UserContext, Options, Timeout) ->
+             ok | {error, any()} when Table::atom(),
+                                      Key::any(),
+                                      Method::atom(),
+                                      Callback::module(),
+                                      UserContext::any(),
+                                      Options::[{tran_prop(), any()}],
+                                      Timeout::non_neg_integer|infinity).
+run(Table, Key, Method, Callback, UserContext, Options, Timeout) ->
+    gen_server:call(?MODULE, {run, Table, Key, Method, Callback, UserContext, Options}, Timeout).
 
 
 %% @doc Retrieve a state by the table and the key
