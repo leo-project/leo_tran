@@ -23,7 +23,7 @@
 {application, leo_tran,
  [
   {description, "Leo's Transaction Manager"},
-  {vsn, "0.2.13"},
+  {vsn, "2.0.0"},
   {registered, []},
   {applications, [
                   kernel,
