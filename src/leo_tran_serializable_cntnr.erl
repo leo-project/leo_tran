@@ -3,6 +3,7 @@
 %% Leo Transaction Manager
 %%
 %% Copyright (c) 2012-2017 Rakuten, Inc.
+%% Copyright (c) 2019-2025 Lions Data, Ltd.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -45,8 +46,8 @@
          code_change/3
         ]).
 
--record(state, {monitor_list = [],
-                tran_list = []
+-record(state, {monitor_list = #{} :: map(),
+                tran_list = #{} :: map()
                }).
 
 -define(DEF_TIMEOUT, 30000).
@@ -119,8 +120,8 @@ all_states() ->
 %%--------------------------------------------------------------------
 %% @doc gen_server callback - Module:init(Args) -> Result
 init([]) ->
-    {ok, #state{monitor_list = dict:new(),
-                tran_list = dict:new()}}.
+    {ok, #state{monitor_list = #{},
+                tran_list = #{}}}.
 
 
 %% @doc gen_server callback - Module:handle_call(Request, From, State) -> Result
@@ -136,7 +137,7 @@ handle_call({run, Table, Key, Method, Callback, UserContext, Options},
                          tran_list = TranList} = State) ->
     %%  Check already started transaction(s)
     %%  And need to lock the transaction
-    HasTran = (error /= dict:find({Table, Key, Method}, TranList)),
+    HasTran = maps:is_key({Table, Key, Method}, TranList),
     CanStartTran = case leo_misc:get_value(?PROP_IS_WAIT_FOR_TRAN, Options, true) of
                        true ->
                            true;
@@ -164,10 +165,10 @@ handle_call({run, Table, Key, Method, Callback, UserContext, Options},
                                    wait
                            end,
                     ok = erlang:apply(leo_tran_handler, Verb, [ChildPid, MonitorRef]),
-                    TranList_1 = dict:append({Table, Key, Method},
+                    TranList_1 = maps_append({Table, Key, Method},
                                              {MonitorRef, ChildPid, Clock}, TranList),
-                    MonList_1 = dict:store(MonitorRef, {Table, Key, Method,
-                                                        From, ChildPid, Clock}, MonitorList),
+                    MonList_1 = maps:put(MonitorRef, {Table, Key, Method,
+                                                       From, ChildPid, Clock}, MonitorList),
                     {noreply, State#state{monitor_list = MonList_1,
                                           tran_list = TranList_1}};
                 {error, Cause} ->
@@ -178,21 +179,21 @@ handle_call({run, Table, Key, Method, Callback, UserContext, Options},
     end;
 
 handle_call({state, Table, Key, Method},_From, #state{tran_list = TranList} = State) ->
-    Ret = case (error == dict:find({Table, Key, Method}, TranList)) of
-              true ->
-                  not_running;
+    Ret = case maps:is_key({Table, Key, Method}, TranList) of
               false ->
+                  not_running;
+              true ->
                   running
           end,
     {reply, {ok, Ret}, State};
 
 handle_call(all_states,_From, #state{tran_list = TranList} = State) ->
-    RetL = case (dict:size(TranList) == 0) of
+    RetL = case maps:size(TranList) == 0 of
                true ->
                    [];
                false ->
                    [{Tbl, Key, Method}
-                    || {{Tbl, Key, Method},_} <- dict:to_list(TranList)]
+                    || {{Tbl, Key, Method},_} <- maps:to_list(TranList)]
            end,
     {reply, {ok, RetL}, State};
 
@@ -213,22 +214,22 @@ handle_info({Msg, ChildPid, MonitorRef, TranState, Table, Key, Method, Reply},
                                                        Msg == timeout ->
     %% Modify the monitor-reference list
     MonitorRef_1 = get_monitor_ref(MonitorRef, ChildPid, MonList),
-    MonList_1 = case dict:find(MonitorRef_1, MonList) of
+    MonList_1 = case maps:find(MonitorRef_1, MonList) of
                     {ok,{_Table,_Key,_Method, From,_ChildPid,_StartedAt}} ->
                         gen_server:reply(From, Reply),
-                        dict:erase(MonitorRef, MonList);
+                        maps:remove(MonitorRef, MonList);
                     _ ->
                         MonList
                 end,
 
     %% Modify the transaction list
-    TranList_1 = case dict:find({Table, Key, Method}, TranList) of
+    TranList_1 = case maps:find({Table, Key, Method}, TranList) of
                      {ok, RetL} ->
                          MonRefL = exclude_monitor_ref(RetL, MonitorRef, []),
                          case TranState of
                              run ->
                                  _ = send_reume_to_waiting_procs(MonRefL, MonList),
-                                 dict:erase({Table, Key, Method}, TranList);
+                                 maps:remove({Table, Key, Method}, TranList);
                              _ ->
                                  TranList
                          end;
@@ -240,10 +241,10 @@ handle_info({Msg, ChildPid, MonitorRef, TranState, Table, Key, Method, Reply},
 handle_info({'DOWN', MonitorRef, _Type,_Pid, _Info}, #state{monitor_list = MonList,
                                                             tran_list = TranList} = State) ->
     {Table_1, Key_1, Method_1, MonList_1} =
-        case dict:find(MonitorRef, MonList) of
+        case maps:find(MonitorRef, MonList) of
             {ok,{Table, Key, Method, From,_StartedAt}} ->
                 gen_server:reply(From, {error, badtran}),
-                {Table, Key, Method, dict:erase(MonitorRef, MonList)};
+                {Table, Key, Method, maps:remove(MonitorRef, MonList)};
             _ ->
                 {null, null, null, MonList}
         end,
@@ -251,10 +252,10 @@ handle_info({'DOWN', MonitorRef, _Type,_Pid, _Info}, #state{monitor_list = MonLi
     TranList_1 =
         case (Table_1 /= null andalso Key_1 /= null andalso Method_1 /= null) of
             true ->
-                case dict:find({Table_1, Key_1, Method_1}, TranList) of
+                case maps:find({Table_1, Key_1, Method_1}, TranList) of
                     {ok, RetL} ->
                         MonRefL = exclude_monitor_ref(RetL, MonitorRef, []),
-                        dict:store({Table_1, Key_1, Method_1}, MonRefL, TranList);
+                        maps:put({Table_1, Key_1, Method_1}, MonRefL, TranList);
                     _ ->
                         TranList
                 end;
@@ -288,6 +289,16 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %% INNER FUNCTIONS
 %%--------------------------------------------------------------------
+%% @doc Append value to a list in map (similar to dict:append)
+%% @private
+maps_append(Key, Value, Map) ->
+    case maps:find(Key, Map) of
+        {ok, List} when is_list(List) ->
+            maps:put(Key, List ++ [Value], Map);
+        error ->
+            maps:put(Key, [Value], Map)
+    end.
+
 %% @doc Exclude a monitor reference from the monitor list
 %% @private
 exclude_monitor_ref([],_MonitorRef, Acc) ->
@@ -303,10 +314,10 @@ exclude_monitor_ref([{_MonitorRef,_,_} = Info|Rest],_, Acc) ->
 send_reume_to_waiting_procs([], MonList) ->
     {ok, MonList};
 send_reume_to_waiting_procs([{MonitorRef,_,_}|Rest], MonList) ->
-    MonList_1 = case dict:find(MonitorRef, MonList) of
+    MonList_1 = case maps:find(MonitorRef, MonList) of
                     {ok,{_Table,_Key,_Method,_From,ChildPid,_StartedAt}} ->
                         ok = leo_tran_handler:resume(ChildPid, MonitorRef),
-                        dict:erase(MonitorRef, MonList);
+                        maps:remove(MonitorRef, MonList);
                     _ ->
                         MonList
                 end,
@@ -316,13 +327,13 @@ send_reume_to_waiting_procs([{MonitorRef,_,_}|Rest], MonList) ->
 %% @doc Retrieve a monitor-list
 %% @private
 get_monitor_ref(null, ChildPid, MonitorList) ->
-    lists:foldl(fun({MonitorRef, {_Table,_Key,_Method,_From,_ChildPid,_Clock}}, SoFar) ->
-                        case _ChildPid of
-                            ChildPid ->
-                                MonitorRef;
-                            _ ->
-                                SoFar
-                        end
-                end, [], dict:to_list(MonitorList));
+    maps:fold(fun(MonitorRef, {_Table,_Key,_Method,_From,_ChildPid,_Clock}, SoFar) ->
+                      case _ChildPid of
+                          ChildPid ->
+                              MonitorRef;
+                          _ ->
+                              SoFar
+                      end
+              end, [], MonitorList);
 get_monitor_ref(MonitorRef,_,_) ->
     MonitorRef.
