@@ -3,6 +3,7 @@
 %% Leo Transaction Manager
 %%
 %% Copyright (c) 2012-2015 Rakuten, Inc.
+%% Copyright (c) 2019-2025 Lions Data, Ltd.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -36,22 +37,41 @@
 %% To avoid unused warning
 -export([wait_proc/4]).
 
-all_delete_test_() ->
+setup() ->
+    ok = application:ensure_started(leo_commons),
+    ok = application:start(leo_tran),
+    ok.
+
+teardown(_) ->
+    _ = application:stop(leo_tran),
+    _ = application:stop(leo_commons),
+    ok.
+
+suite_test_() ->
     {setup,
-     fun ( ) ->
-             application:start(leo_tran),
-             ok
-     end,
-     fun (_) ->
-             application:stop(leo_tran),
-             ok
-     end,
+     fun setup/0,
+     fun teardown/1,
      [
       {"test compaction",
-       {timeout, 10000, fun suite/0}},
+       {timeout, 30, fun suite/0}}
+     ]}.
+
+wait_notify_test_() ->
+    {setup,
+     fun setup/0,
+     fun teardown/1,
+     [
       {"test wait/notify functionality",
-       {timeout, 10000, fun wait_notify/0}},
-      fun tran_exclusive_lock/0
+       {timeout, 30, fun wait_notify/0}}
+     ]}.
+
+tran_exclusive_lock_test_() ->
+    {setup,
+     fun setup/0,
+     fun teardown/1,
+     [
+      {"test exclusive lock",
+       {timeout, 30, fun tran_exclusive_lock/0}}
      ]}.
 
 suite() ->
@@ -135,6 +155,8 @@ tran_exclusive_lock_recv(N, OK, NG) ->
         Unknown ->
             io:format(user, "[error] Received an unknown message:~p~n", [Unknown]),
             tran_exclusive_lock_recv(N - 1, OK, NG)
+    after 10000 ->
+        {timeout, {OK, NG, N}}
     end.
 
 tran_exclusive_lock() ->

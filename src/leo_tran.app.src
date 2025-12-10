@@ -1,10 +1,10 @@
 %% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
 %%======================================================================
 %%
-%% Leo Tannsaction Manager
+%% Leo Transaction Manager
 %%
 %% Copyright (c) 2012-2018 Rakuten, Inc.
-%% Copyright (c) 2019-2020 Lions Data, Ltd.
+%% Copyright (c) 2019-2025 Lions Data, Ltd.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -24,12 +24,15 @@
 {application, leo_tran,
  [
   {description, "Leo's Transaction Manager"},
-  {vsn, "0.2.15"},
+  {vsn, "1.0.0"},
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+                  leo_commons
                  ]},
   {mod, { leo_tran_app, []}},
-  {env, []}
+  {env, []},
+  {licenses, ["Apache-2.0"]},
+  {links, [{"GitHub", "https://github.com/leo-project/leo_tran"}]}
  ]}.

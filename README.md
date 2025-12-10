@@ -1,103 +1,176 @@
 leo_tran
 ========
 
-[![Build Status](https://secure.travis-ci.org/leo-project/leo_tran.png?branch=develop)](http://travis-ci.org/leo-project/leo_tran)
-
-**leo_tran** is a library to handle a data-transaction.
-We can easily write programs that manager a data-transaction to avoid a conflicts.
+**leo_tran** is a library to handle data transactions.
+You can easily write programs that manage data transactions to avoid conflicts.
 
 ## Build Information
 
-* "leo_tran" uses the [rebar](https://github.com/rebar/rebar) build system. Makefile so that simply running "make" at the top level should work.
-* "leo_tran" requires Erlang R16B03-1 or later.
+* **leo_tran** uses [rebar3](https://www.rebar3.org/) as the build system.
+* Requires Erlang/OTP 22 or later (tested with OTP 28).
 
+## Quick Start
+
+```bash
+# Compile
+make compile
+
+# Run tests
+make eunit
+
+# Run xref analysis
+make xref
+
+# Clean build artifacts
+make clean
+```
 
 ## Usage in Leo Project
 
-**leo_tran** is used in [**leo_storage**](https://github.com/leo-project/leo_storage) and others.
-It is used to reduce unnecessary request between remote-nodes.
+**leo_tran** is used in [**leo_storage**](https://github.com/leo-project/leo_storage) and other Leo Project components.
+It is used to reduce unnecessary requests between remote nodes.
 
 ## Usage
 
-We prepare a server program and a client program to use **leo_tran**.
-
-First, a callback program is as below:
+### Basic Usage
 
 ```erlang
-%% Launch leo_tran:
+%% Start the application (leo_commons must be started first)
+ok = application:ensure_started(leo_commons),
 ok = application:start(leo_tran).
+
+%% Run a transaction
+Table = my_table,
+Key = <<"my_key">>,
 Method = get,
-{value, {ok, Ret_1}} = leo_tran:run(<<"TABLE">>, <<"ID">>, Method, leo_tran_handler_sample).
+Callback = my_tran_handler,
+UserContext = #{user_data => some_value},
 
-%% Able to control a transaction by options:
-%%     - Default timeout: 5000 (ms)
-%%     - Default is_wait_for_tran: true
-%%     - Default is_lock_tran: true
-{value, {ok, Ret_2}} = leo_tran:run(<<"TABLE">>, <<"ID">>, Method, leo_tran_handler_sample,
-                                   [{?PROP_TIMEOUT, timer:seconds(1)},
-                                    {?PROP_IS_WAIT_FOR_TRAN, true},
-                                    {?PROP_IS_LOCK_TRAN, true}
-                                   ]).
+{value, ok} = leo_tran:run(Table, Key, Method, Callback, UserContext).
+```
 
-%% A Callback Module:
--module(leo_tran_handler_sample).
+### Transaction Options
+
+You can control transaction behavior with options:
+
+```erlang
+Options = [
+    {timeout, timer:seconds(10)},      %% Transaction timeout (default: 5000ms)
+    {is_wait_for_tran, true},          %% Wait for existing transaction (default: true)
+    {is_lock_tran, true}               %% Lock the transaction (default: true)
+],
+
+{value, ok} = leo_tran:run(Table, Key, Method, Callback, UserContext, Options).
+```
+
+### Checking Transaction State
+
+```erlang
+%% Check if a transaction is running
+{ok, running} = leo_tran:state(Table, Key, Method).
+{ok, not_running} = leo_tran:state(Table, Key, Method).
+
+%% Get all active transactions
+{ok, [{Table, Key, Method}, ...]} = leo_tran:all_states().
+```
+
+### Wait/Notify Pattern
+
+```erlang
+%% Block the caller until notify_all is called
+spawn(fun() -> leo_tran:wait(Table, Key, Method) end).
+
+%% Resume all waiting processes
+leo_tran:notify_all(Table, Key, Method).
+```
+
+## Callback Module
+
+Implement the `leo_tran_behaviour` to create a transaction handler:
+
+```erlang
+-module(my_tran_handler).
 -behaviour(leo_tran_behaviour).
--include("leo_tran.hrl").
--include_lib("eunit/include/eunit.hrl").
 
--export([run/4, wait/4, resume/4,
-         commit/4, rollback/5]).
+-include_lib("leo_tran/include/leo_tran.hrl").
 
--define(MIN_DURATION, timer:seconds(1)).
+-export([run/5, wait/5, resume/5, commit/5, rollback/6]).
 
--spec(run(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
-             ok | {error, any()}).
-run(Table, Key, get, State) ->
-    ?debugFmt("GET: ~w, ~p, ~w",
-              [Table, Key, State#tran_state.started_at]),
-    ok;
-run(Table, Key, put, State) ->
-    ?debugFmt("PUT: ~w, ~p, ~w",
-              [Table, Key, State#tran_state.started_at]),
-    ok;
-run(Table, Key, delete, State) ->
-    ?debugFmt("DELETE: ~w, ~p, ~w",
-              [Table, Key, State#tran_state.started_at]),
-    ok;
-run(_,_,_,_) ->
+%% Called when the transaction starts
+-spec run(Table, Key, Method, UserContext, State) -> ok | {error, any()} when
+    Table :: atom(),
+    Key :: any(),
+    Method :: atom(),
+    UserContext :: any(),
+    State :: #tran_state{}.
+run(Table, Key, Method, UserContext, State) ->
+    %% Your transaction logic here
+    io:format("Running transaction: ~p/~p/~p~n", [Table, Key, Method]),
     ok.
 
-
--spec(wait(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
-             ok | {error, any()}).
-wait(Table, Key, Method, State) ->
-    ?debugFmt("* WAIT: ~w, ~p, ~w, ~w",
-              [Table, Key, Method, State#tran_state.started_at]),
+%% Called when waiting for another transaction
+-spec wait(Table, Key, Method, UserContext, State) -> ok | {error, any()} when
+    Table :: atom(),
+    Key :: any(),
+    Method :: atom(),
+    UserContext :: any(),
+    State :: #tran_state{}.
+wait(_Table, _Key, _Method, _UserContext, _State) ->
     ok.
 
+%% Called when resuming after waiting
+-spec resume(Table, Key, Method, UserContext, State) -> ok | {error, any()} when
+    Table :: atom(),
+    Key :: any(),
+    Method :: atom(),
+    UserContext :: any(),
+    State :: #tran_state{}.
+resume(Table, Key, Method, UserContext, State) ->
+    %% Continue transaction after waiting
+    run(Table, Key, Method, UserContext, State).
 
--spec(resume(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
-             ok | {error, any()}).
-resume(Table, Key, Method,_State) ->
-    ?debugFmt("=> RESUME: ~w, ~p, ~w", [Table, Key, Method]),
+%% Called on successful completion
+-spec commit(Table, Key, Method, UserContext, State) -> ok | {error, any()} when
+    Table :: atom(),
+    Key :: any(),
+    Method :: atom(),
+    UserContext :: any(),
+    State :: #tran_state{}.
+commit(_Table, _Key, _Method, _UserContext, _State) ->
     ok.
 
-
--spec(commit(Table::atom(), Key::binary(), Method::atom(), State::#tran_state{}) ->
-             ok | {error, any()}).
-commit(Table, Key, Method,_State) ->
-    ?debugFmt("===> COMMIT: ~w, ~p, ~w", [Table, Key, Method]),
-    ok.
-
-
--spec(rollback(Table::atom(), Key::binary(), Method::atom(),
-               Reason::any(), State::#tran_state{}) ->
-             ok | {error, any()}).
-rollback(Table, Key, Method, Reason,_State) ->
-    ?debugFmt("===> ROLLBACK: ~w, ~p, ~w, ~p", [Table, Key, Method, Reason]),
+%% Called on failure
+-spec rollback(Table, Key, Method, UserContext, Reason, State) -> ok | {error, any()} when
+    Table :: atom(),
+    Key :: any(),
+    Method :: atom(),
+    UserContext :: any(),
+    Reason :: any(),
+    State :: #tran_state{}.
+rollback(_Table, _Key, _Method, _UserContext, _Reason, _State) ->
     ok.
 ```
 
+## Transaction State Record
+
+The `#tran_state{}` record contains:
+
+```erlang
+-record(tran_state, {
+    table :: atom(),
+    key :: any(),
+    method :: atom(),
+    is_lock_tran :: boolean(),
+    is_wait_for_tran :: boolean(),
+    state :: tran_state(),
+    timeout :: pos_integer(),
+    started_at :: integer()
+}).
+```
+
+## Dependencies
+
+* [leo_commons](https://github.com/leo-project/leo_commons) >= 1.3.0
 
 ## License
 

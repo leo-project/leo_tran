@@ -3,6 +3,7 @@
 %% Leo Transaction Concurrent Container
 %%
 %% Copyright (c) 2012-2017 Rakuten, Inc.
+%% Copyright (c) 2019-2025 Lions Data, Ltd.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -46,7 +47,7 @@
 
 -record(state,
         {
-          wait_list = []
+          wait_list = #{} :: map()
         }).
 
 -define(DEF_TIMEOUT, 30000).
@@ -93,7 +94,7 @@ notify_all(Table, Key, Method) ->
 %%--------------------------------------------------------------------
 %% @doc gen_server callback - Module:init(Args) -> Result
 init([]) ->
-    {ok, #state{wait_list = dict:new()}}.
+    {ok, #state{wait_list = #{}}}.
 
 
 %% @doc gen_server callback - Module:handle_call(Request, From, State) -> Result
@@ -107,15 +108,15 @@ handle_call(stop, _From, State) ->
 handle_call({wait, Table, Key, Method},
             From, #state{wait_list = WaitList} = State) ->
     %% Add a caller process to wait list
-    NewWaitList = dict:append({Table, Key, Method}, From, WaitList),
+    NewWaitList = maps_append({Table, Key, Method}, From, WaitList),
     {noreply, State#state{wait_list = NewWaitList}};
 
 handle_call({notify_all, Table, Key, Method},
             _From, #state{wait_list = WaitList} = State) ->
-    case dict:find({Table, Key, Method}, WaitList) of
+    case maps:find({Table, Key, Method}, WaitList) of
         {ok, PidList} ->
             [gen_server:reply(WaitProc, ok) || WaitProc <- PidList],
-            {reply, ok, State#state{wait_list = dict:erase({Table, Key, Method}, WaitList)}};
+            {reply, ok, State#state{wait_list = maps:remove({Table, Key, Method}, WaitList)}};
         error ->
             {reply, ok, State}
     end;
@@ -156,3 +157,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%--------------------------------------------------------------------
 %% INNER FUNCTIONS
 %%--------------------------------------------------------------------
+%% @doc Append value to a list in map (similar to dict:append)
+%% @private
+maps_append(Key, Value, Map) ->
+    case maps:find(Key, Map) of
+        {ok, List} when is_list(List) ->
+            maps:put(Key, List ++ [Value], Map);
+        error ->
+            maps:put(Key, [Value], Map)
+    end.

@@ -7,3 +7,12 @@ leo_tran.dot
 leo_tran.png
 .rebar/
 doc/
+
+# rebar3
+_build/
+_checkouts/
+rebar.lock
+*.beam
+*.plt
+crash.dump
+erl_crash.dump
